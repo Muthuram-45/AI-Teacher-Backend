@@ -21,10 +21,10 @@ app.get("/api/tts", async (req, res) => {
     if (!text) return res.status(400).send("Text is required");
 
     // Google Translate TTS silently fails on long text — reject early
-    if (text.length > 200) {
-      console.warn(`⚠️ TTS text too long (${text.length} chars). Split into shorter chunks first.`);
-      return res.status(400).send("Text too long. Split into chunks of ≤200 chars.");
-    }
+    // if (text.length > 200) {
+    //   console.warn(`⚠️ TTS text too long (${text.length} chars). Split into shorter chunks first.`);
+    //   return res.status(400).send("Text too long. Split into chunks of ≤200 chars.");
+    // }
 
     const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
 
@@ -320,11 +320,10 @@ app.post("/ask-ai", async (req, res) => {
             "You are a friendly classroom Teacher. Answer student questions in SHORT, SWEET, simple English — maximum 3 lines. " +
             "RULES: " +
             "1. Give a clear, direct answer in plain English. " +
-            "2. Use numbered steps (1. 2. 3.) only if essential — keep each step one short sentence. " +
-            "3. Never exceed 3 lines total. " +
-            "4. Never use 'Namaste', 'Ji', or any cultural/regional words. " +
-            "5. Never use filler openers like 'Great question!' or 'Of course!'. " +
-            "6. Go straight to the point.",
+            "2. Never exceed 3 lines total. " +
+            "3. Never use 'Namaste', 'Ji', or any cultural/regional words. " +
+            "4. Never use filler openers like 'Great question!' or 'Of course!'. " +
+            "5. Go straight to the point.",
         },
         {
           role: "user",
