@@ -146,6 +146,11 @@ async function processTranscription(directory, sessionId, className) {
     fs.writeFileSync(summaryPath, summary);
     console.log(`✅ Summary saved to ${summaryPath}`);
 
+    // Append summary to the full transcript
+    fullTranscript += `\n--- CLASS SUMMARY ---\n${summary}\n`;
+    fs.writeFileSync(transcriptionPath, fullTranscript);
+    console.log(`✅ Class Summary appended to ${transcriptionPath}`);
+
     try {
         fs.unlinkSync(listFilePath);
         fs.unlinkSync(audioPath);
