@@ -1,0 +1,24 @@
+--- SPOKEN AUDIO TRANSCRIPT ---
+ on Python. It would be a beginner friendly course, right? Now what you will get in this course, what I am going to cover, obviously video lectures, theory. Hi Ram, please tell me your doubt. you you
+
+--- TEXT CHAT & QA HISTORY ---
+[Ram]: what is the difference between arithmetic operator and assignment operator in Python
+[AI Answer]: Arithmetic operators do math, like +, -, *, /. 
+Assignment operators change a value, like =, +=, *=.
+
+--- CLASS SUMMARY ---
+Key Points:
+
+1. The course will be focused on Python and will be beginner-friendly.
+2. The course will cover video lectures and theory.
+3. The goal is to make the course easy to understand for beginners.
+4. Python has arithmetic operators for math operations, such as addition, subtraction, multiplication, and division.
+5. Python has assignment operators for changing values, including equal to, addition, and multiplication.
+6. Arithmetic and assignment operators serve different purposes and are used in different contexts.
+7. The course instructor (Ram) asked a question about the difference between arithmetic and assignment operators.
+
+Action Items:
+
+1. Ram should review the difference between arithmetic and assignment operators in Python to better understand the concept.
+2. The instructor should clarify the difference between arithmetic and assignment operators in upcoming course lectures.
+3. The course curriculum should include clear explanations and examples of arithmetic and assignment operators to facilitate student understanding.

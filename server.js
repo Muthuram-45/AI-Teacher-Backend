@@ -14,6 +14,10 @@ app.use(express.json());
 const uploadroutes = require("./Route/uploadroutes");
 app.use("/api", uploadroutes);
 
+// Import and use auth routes
+const authRoutes = require("./Route/authRoutes");
+app.use("/api/auth", authRoutes);
+
 // 🔊 TTS Proxy to bypass CORS for recording
 app.get("/api/tts", async (req, res) => {
   try {
