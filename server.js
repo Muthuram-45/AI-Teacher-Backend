@@ -117,6 +117,12 @@ app.get("/active-voice", (req, res) => {
   res.json({ activeVoice });
 });
 
+const getDeviceType = (userAgent) => {
+  if (/mobile/i.test(userAgent)) return "Mobile";
+  if (/tablet|ipad/i.test(userAgent)) return "Tablet";
+  return "Laptop";
+};
+
 app.post("/request-join", async (req, res) => {
   const { name, room } = req.body;
   if (!name || !room) {
@@ -129,10 +135,13 @@ app.post("/request-join", async (req, res) => {
       .json({ error: "You have been blocked from this room by the teacher." });
   }
 
-  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  waitingStudents[requestId] = { name, room, status: "waiting" };
+  const userAgent = req.headers["user-agent"] || "";
+  const deviceType = getDeviceType(userAgent);
 
-  console.log(`📥 JOIN REQUEST: ${name} for room ${room}. ID: ${requestId}`);
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  waitingStudents[requestId] = { name, room, status: "waiting", deviceType };
+
+  console.log(`📥 JOIN REQUEST: ${name} for room ${room}. ID: ${requestId} [Device: ${deviceType}]`);
   res.json({ requestId });
 });
 
@@ -177,7 +186,7 @@ app.post("/admit-student", async (req, res) => {
 
   try {
     // Generate token for the student
-    const metadata = { role: "student" };
+    const metadata = { role: "student", device: request.deviceType || "Laptop" };
     const at = new AccessToken(
       process.env.LIVEKIT_API_KEY,
       process.env.LIVEKIT_API_SECRET,
