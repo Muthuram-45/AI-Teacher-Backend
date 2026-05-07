@@ -30,7 +30,7 @@ app.get("/api/tts", async (req, res) => {
     //   return res.status(400).send("Text too long. Split into chunks of ≤200 chars.");
     // }
 
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
+    const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=en&q=${encodeURIComponent(text)}`;
 
     // Add User-Agent to satisfy Google's protection
     const response = await fetch(url, {
