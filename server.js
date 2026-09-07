@@ -1405,6 +1405,21 @@ app.post("/api/generate-video", async (req, res) => {
 
     const data = videoResponse.data;
 
+    // The VideoGenerator now processes all requests asynchronously and returns a 202 response
+    if (data && data.processing) {
+      console.log(`✅ [VIDEO-GEN] Video generation started successfully in background. Job ID: ${data.jobId}`);
+      return res.json({
+        success: true,
+        message: data.message || `Video generation started. Server is processing in background.`,
+        data: {
+          processing: true,
+          jobId: data.jobId,
+          durationMinutes,
+          topic
+        }
+      });
+    }
+
     // Convert relative URLs to absolute URLs using VIDEOGEN_API base origin
     if (data && data.data) {
       const baseUrl = VIDEOGEN_API.replace(/\/+$/, '');
@@ -1420,11 +1435,42 @@ app.post("/api/generate-video", async (req, res) => {
       }
     }
 
-    console.log(`✅ [VIDEO-GEN] Video generated successfully. ID: ${data.data?.id}`);
+    console.log(`✅ [VIDEO-GEN] Video generated successfully. ID: ${data.data?.id || data.jobId}`);
     res.json(data);
   } catch (err) {
     console.error("❌ [VIDEO-GEN] Proxy error:", err.response ? err.response.data : err.message);
     res.status(err.response ? err.response.status : 500).json({ error: "Failed to generate video", details: err.message });
+  }
+});
+
+// Proxy: Get background job status
+app.get("/api/generate-video/status/:jobId", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const axios = require('axios');
+    const response = await axios.get(`${VIDEOGEN_API}/api/videos/status/${jobId}`);
+    
+    const data = response.data;
+    
+    // Convert relative URLs to absolute URLs using VIDEOGEN_API base origin
+    if (data && data.status === 'completed' && data.data) {
+      const baseUrl = VIDEOGEN_API.replace(/\/+$/, '');
+      if (data.data.videoUrl && data.data.videoUrl.startsWith('/')) {
+        data.data.videoUrl = `${baseUrl}${data.data.videoUrl}`;
+      }
+      if (data.data.videos) {
+        Object.keys(data.data.videos).forEach(lang => {
+          if (data.data.videos[lang].url && data.data.videos[lang].url.startsWith('/')) {
+            data.data.videos[lang].url = `${baseUrl}${data.data.videos[lang].url}`;
+          }
+        });
+      }
+    }
+    
+    res.json(data);
+  } catch (err) {
+    console.error("❌ [VIDEO-GEN STATUS] Proxy error:", err.response ? err.response.data : err.message);
+    res.status(err.response ? err.response.status : 500).json({ error: "Failed to get job status", details: err.message });
   }
 });
 
