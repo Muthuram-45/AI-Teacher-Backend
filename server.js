@@ -9,24 +9,26 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-// Handle JSON credentials from environment variables directly (e.g. on Render)
+// Handle JSON credentials from environment variables (e.g. Render, local dev).
+// On Cloud Run, Application Default Credentials (ADC) are used automatically
+// via the service account — no JSON key or env var is needed.
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS && process.env.GOOGLE_APPLICATION_CREDENTIALS.trim().startsWith('{')) {
   try {
     const tmpPath = path.join(os.tmpdir(), 'google-creds.json');
     fs.writeFileSync(tmpPath, process.env.GOOGLE_APPLICATION_CREDENTIALS);
     process.env.GOOGLE_APPLICATION_CREDENTIALS = tmpPath;
-    console.log("✅ Written JSON credentials to temporary file:", tmpPath);
+    console.log("✅ Google credentials written to temporary file.");
   } catch (err) {
-    console.error("❌ Failed to write temporary credentials file:", err);
+    console.error("❌ Failed to write temporary credentials file:", err.message);
   }
 } else if (process.env.GOOGLE_CREDENTIALS_JSON) {
   try {
     const tmpPath = path.join(os.tmpdir(), 'google-creds.json');
     fs.writeFileSync(tmpPath, process.env.GOOGLE_CREDENTIALS_JSON);
     process.env.GOOGLE_APPLICATION_CREDENTIALS = tmpPath;
-    console.log("✅ Written JSON credentials to temporary file:", tmpPath);
+    console.log("✅ Google credentials written to temporary file.");
   } catch (err) {
-    console.error("❌ Failed to write temporary credentials file:", err);
+    console.error("❌ Failed to write temporary credentials file:", err.message);
   }
 }
 
@@ -34,13 +36,41 @@ let ttsOptions = {};
 const ttsClient = new textToSpeech.TextToSpeechClient(ttsOptions);
 
 const app = express();
-const port = process.env.PORT || 3001;
+const port = parseInt(process.env.PORT, 10) || 8080;
 
 let activeVoice = "Female"; // Default voice
 global.activeVoice = activeVoice;
 
-app.use(cors());
+// CORS: Use FRONTEND_URL env var in production (comma-separated for multiple origins).
+// In production (NODE_ENV=production), FRONTEND_URL is strictly required.
+// In development, fall back to true (allow all origins).
+const isProduction = process.env.NODE_ENV === "production";
+let corsOrigin;
+
+if (process.env.FRONTEND_URL) {
+  corsOrigin = process.env.FRONTEND_URL.split(",").map(u => u.trim());
+} else if (isProduction) {
+  console.error("❌ FRONTEND_URL environment variable is required in production for CORS configuration.");
+  throw new Error("FRONTEND_URL environment variable is required in production.");
+} else {
+  corsOrigin = true;
+}
+
+const corsOptions = {
+  origin: corsOrigin,
+  credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// ❤️ Health check endpoint (lightweight, no external calls)
+app.get("/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "AI Teacher Backend is running",
+    environment: process.env.NODE_ENV || "development"
+  });
+});
 
 // Import and use upload routes
 const uploadroutes = require("./Route/uploadroutes");
@@ -103,10 +133,13 @@ app.post("/api/tts", async (req, res) => {
   }
 });
 
-const client = new GoogleGenAI({
-  vertexai: process.env.GOOGLE_GENAI_USE_VERTEXAI === 'true',
+const useVertexAI = process.env.GOOGLE_GENAI_USE_VERTEXAI === 'true';
+const client = new GoogleGenAI(useVertexAI ? {
+  vertexai: true,
   project: process.env.GOOGLE_CLOUD_PROJECT,
   location: process.env.GOOGLE_CLOUD_LOCATION || "global",
+} : {
+  apiKey: process.env.GEMINI_API_KEY,
 });
 
 const roomService = new RoomServiceClient(
@@ -1327,7 +1360,9 @@ Rules:
 // ========================================
 // 🎬 Video Generation Integration (proxy to VideoGenerator server)
 // ========================================
-const rawVideogenUrl = process.env.VIDEOGEN_API_URL || (process.env.NODE_ENV === 'production' ? 'https://videogenerator-backend-ws81.onrender.com' : 'http://localhost:5000');
+// Video Generator URL: MUST be set via VIDEOGEN_API_URL in production.
+// Falls back to localhost:5000 for local development only.
+const rawVideogenUrl = process.env.VIDEOGEN_API_URL || 'http://localhost:5000';
 const VIDEOGEN_API = rawVideogenUrl.replace(/\/+$/, '');
 
 // Proxy: Trigger one-shot video generation
@@ -1486,6 +1521,47 @@ app.get("/api/video-voices", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Backend server running on http://localhost:${port}`);
+// ⚠️ Centralized Express error handler — prevents unhandled errors from crashing the container.
+// Must be registered after all routes.
+app.use((err, req, res, next) => {
+  console.error("Unhandled Express error:", err.message);
+  res.status(500).json({ error: "Internal server error" });
 });
+
+// 🛡️ Process-level safety nets
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Promise Rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+  process.exit(1);
+});
+
+// 🚀 Start server
+const server = app.listen(port, () => {
+  console.log(`🚀 AI Teacher Backend started`);
+  console.log(`   Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`   Port: ${port}`);
+  console.log(`   Vertex AI: ${process.env.GOOGLE_GENAI_USE_VERTEXAI === 'true' ? 'enabled' : 'disabled'}`);
+  console.log(`   Video Generator: ${VIDEOGEN_API}`);
+  console.log(`   LiveKit: ${process.env.LIVEKIT_URL ? 'configured' : 'NOT SET'}`);
+  console.log(`   CORS origins: ${process.env.FRONTEND_URL || 'all (development)'}`);
+});
+
+// 🛑 Graceful shutdown for Cloud Run (handles SIGTERM) and local dev (SIGINT)
+function gracefulShutdown(signal) {
+  console.log(`\n🛑 ${signal} received. Shutting down gracefully...`);
+  server.close(() => {
+    console.log("✅ Server closed. Exiting.");
+    process.exit(0);
+  });
+  // Force exit after 10 seconds if connections don't close
+  setTimeout(() => {
+    console.error("⚠️ Forced shutdown after timeout.");
+    process.exit(1);
+  }, 10000);
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
